@@ -6,7 +6,7 @@ type IDTaskRequest struct {
 }
 
 // NewRemoveTaskRequest cria uma nova instância de RemoveTaskRequest.
-func NewRemoveTaskRequest(taskId string) *IDTaskRequest {
+func NewIDTaskRequest(taskId string) *IDTaskRequest {
 	return &IDTaskRequest{
 		TaskID: taskId,
 	}
