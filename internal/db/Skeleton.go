@@ -10,7 +10,7 @@ import (
 	"github.com/hscHeric/task-manager-server/internal/task"
 )
 
-const dbPath = "/home/gabriel/Downloads/task-manager-server-main/cmd/server/tasks.db"
+const dbPath = "./tasks.db"
 
 type Skeleton struct{}
 
