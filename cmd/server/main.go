@@ -1,42 +1,40 @@
 package main
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
-	"log"
-	"time"
+	"net/http"
 
-	"github.com/hscHeric/task-manager-server/internal/db" // Assuming this is your project path
-	"github.com/hscHeric/task-manager-server/internal/task"
+	"github.com/hscHeric/task-manager-server/internal/message"
+	udpserver "github.com/hscHeric/task-manager-server/internal/udpServer"
 )
+
+// Assuming this is your project path
 
 const dbPath = "./tasks.db"
 
 func main() {
-	fmt.Println("Aqui")
-	dbConn, err := sql.Open("sqlite3", dbPath)
+	idGen := message.NewIDGenerator()
+	mm := message.NewMessage("ola", "ola", []byte("ola"), http.StatusCreated, http.StatusAccepted, idGen)
+	m, _ := json.Marshal(mm)
+	fmt.Println(string(m))
+
+	server, err := udpserver.NewUDPServer(":1234")
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error ao criar o servidor", err)
+		return
 	}
+	defer server.Close()
 
-	fmt.Println("Connected to database")
-	defer dbConn.Close()
+	for {
+		msg, _, err := server.GetRequest()
+		if err != nil {
+			fmt.Println("Erro ao receber a mensagem:", err)
+			continue
+		}
 
-	dbService := db.NewDatabaseService(dbConn)
-
-	dt := time.Now()
-	newTask := task.NewTask("ola mundo", "ola mundo", dt) // Assuming this creates a task object
-	if err := dbService.InsertTask(newTask); err != nil {
-		log.Fatal(err)
-	}
-
-	tasks, err := dbService.GetAllTasks()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("Tasks:")
-	for _, t := range tasks {
-		fmt.Println(t)
+		if msg != nil {
+			fmt.Println("ok")
+		}
 	}
 }
