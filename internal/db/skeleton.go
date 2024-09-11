@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/hscHeric/task-manager-server/internal/task"
+	_ "github.com/mattn/go-sqlite3" // Importa o driver SQLite
 )
 
-const dbPath = "./tasks.db"
+const dbPath = "/home/gabriel/Downloads/SD_ENVIO_03/task-manager-server/cmd/server/tasks.db"
 
 type Skeleton struct{}
 
@@ -38,91 +39,74 @@ type request struct {
 	Description string    `json:"description"`
 }
 
-// Response é a estrutura de resposta padrão para todas as operações do Skeleton
-type Response struct {
-	Data  interface{} `json:"data,omitempty"` // Pode ser qualquer tipo: Task, lista de Tasks, etc.
-	Error string      `json:"error,omitempty"`
+type ID struct {
+	TaskID string `json:"taskId"`
 }
 
-// NewResponse cria uma nova resposta padronizada com dados ou erro
-func NewResponse(data interface{}, err error) *Response {
-	if err != nil {
-		return &Response{Error: err.Error()}
-	}
-	return &Response{Data: data}
-}
-
-func (s *Skeleton) InsertTask(data []byte) *Response {
+func (s *Skeleton) InsertTask(data []byte) ([]byte, error) {
 	var req request
 	dbConn := initDB()
 	defer dbConn.Close()
 
-	// Desserializa o JSON para a estrutura `request`
 	if err := json.Unmarshal(data, &req); err != nil {
-		return NewResponse(nil, fmt.Errorf("falha ao desserializar o JSON da requisição: %w", err))
+		return nil, fmt.Errorf("falha ao desserializar o JSON da requisição: %w", err)
 	}
 
-	// Cria uma nova tarefa com os dados da requisição
 	newTask := task.NewTask(req.Title, req.Description, req.Date)
 	dbService := NewDatabaseService(dbConn)
 
 	if err := dbService.InsertTask(newTask); err != nil {
-		return NewResponse(nil, fmt.Errorf("falha ao inserir a tarefa no banco de dados: %w", err))
+		return nil, fmt.Errorf("falha ao inserir a tarefa no banco de dados: %w", err)
 	}
 
-	return NewResponse("Tarefa inserida com sucesso", nil)
+	return json.Marshal("Tarefa inserida com sucesso")
 }
 
-func (s *Skeleton) GetAllTasks() *Response {
+func (s *Skeleton) GetAllTasks() ([]byte, error) {
 	dbConn := initDB()
 	defer dbConn.Close()
 	dbService := NewDatabaseService(dbConn)
 
 	tasks, err := dbService.GetAllTasks()
 	if err != nil {
-		return NewResponse(nil, fmt.Errorf("falha ao obter as tarefas: %w", err))
+		return nil, fmt.Errorf("falha ao obter as tarefas: %w", err)
 	}
 
-	return NewResponse(tasks, nil)
+	return json.Marshal(tasks)
 }
 
-type ID struct {
-	TaskID string `json:"taskId"`
-}
-
-func (s *Skeleton) GetTaskByID(data []byte) *Response {
-	dbConn := initDB()
-	defer dbConn.Close()
-	dbService := NewDatabaseService(dbConn)
-
-	var id ID
-	err := json.Unmarshal(data, &id)
-	if err != nil {
-		return NewResponse(nil, fmt.Errorf("erro ao desserializar o ID: %w", err))
-	}
-
-	task, err := dbService.GetTaskByID(id.TaskID)
-	if err != nil {
-		return NewResponse(nil, fmt.Errorf("erro ao obter a tarefa: %w", err))
-	}
-
-	return NewResponse(task, nil)
-}
-
-func (s *Skeleton) DeleteTask(data []byte) *Response {
+func (s *Skeleton) GetTaskByID(data []byte) ([]byte, error) {
 	dbConn := initDB()
 	defer dbConn.Close()
 	dbService := NewDatabaseService(dbConn)
 
 	var id ID
 	if err := json.Unmarshal(data, &id); err != nil {
-		return NewResponse(nil, fmt.Errorf("erro ao desserializar o ID: %w", err))
+		return nil, fmt.Errorf("erro ao desserializar o ID: %w", err)
 	}
 
-	err := dbService.DeleteTask(id.TaskID)
+	t, err := dbService.GetTaskByID(id.TaskID)
 	if err != nil {
-		return NewResponse(nil, fmt.Errorf("erro ao excluir a tarefa: %w", err))
+		return nil, fmt.Errorf("erro ao obter a tarefa: %w", err)
 	}
 
-	return NewResponse("Tarefa excluída com sucesso", nil)
+	return json.Marshal(t)
 }
+
+func (s *Skeleton) DeleteTask(data []byte) ([]byte, error) {
+	dbConn := initDB()
+	defer dbConn.Close()
+	dbService := NewDatabaseService(dbConn)
+
+	var id ID
+	if err := json.Unmarshal(data, &id); err != nil {
+		return nil, fmt.Errorf("erro ao desserializar o ID: %w", err)
+	}
+
+	if err := dbService.DeleteTask(id.TaskID); err != nil {
+		return nil, fmt.Errorf("erro ao excluir a tarefa: %w", err)
+	}
+
+	return json.Marshal("Tarefa excluída com sucesso")
+}
+
