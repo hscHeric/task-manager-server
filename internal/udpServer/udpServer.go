@@ -52,25 +52,29 @@ func (s *UDPServer) GetRequest() (*message.Message, *net.UDPAddr, error) {
 		return nil, nil, err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	if msg.ID%3 == 0 {
+		s.mu.Lock()
+		defer s.mu.Unlock()
 
-	cacheKey := addr.String()
+		cacheKey := addr.String()
 
-	if entry, exists := s.cache[cacheKey]; exists {
-		if entry.ID == msg.ID {
-			log.Println("Mensagem duplicada recebida:", msg.ID, "de", addr)
-			return nil, nil, fmt.Errorf("duplicated message: %d", msg.ID)
+		if entry, exists := s.cache[cacheKey]; exists {
+			if entry.ID == msg.ID {
+				log.Println("Mensagem duplicada recebida:", msg.ID, "de", addr)
+				return nil, nil, fmt.Errorf("duplicated message: %d", msg.ID)
+			}
 		}
+
+		s.cache[cacheKey] = &CacheEntry{
+			Addr: addr,
+			ID:   msg.ID,
+		}
+
+		log.Println("Mensagem recebida de:", addr)
+		return &msg, addr, nil
 	}
 
-	s.cache[cacheKey] = &CacheEntry{
-		Addr: addr,
-		ID:   msg.ID,
-	}
-
-	log.Println("Mensagem recebida de:", addr)
-	return &msg, addr, nil
+	return nil, nil, fmt.Errorf("o id da mensagem é multiplo de 3, logo é ignorada")
 }
 
 func (s *UDPServer) SendResponse(addr *net.UDPAddr, response *message.Message) error {
@@ -96,7 +100,6 @@ func (s *UDPServer) handleRequest(m *message.Message) []byte {
 	skeleton := db.NewSkeleton()
 	dispatcher := db.NewDispacher(skeleton)
 	response, err := dispatcher.Invoke(m.ObjReference, m.MethodID, m.Args)
-
 	if err != nil {
 		log.Printf("Erro ao obter resposta: %v", err)
 		return nil
@@ -121,7 +124,6 @@ func (s *UDPServer) Start() {
 		if response == nil {
 			// Se a resposta for nil, envie uma mensagem de encerramento
 			shutdownMessage := &message.Message{
-
 				ObjReference: msg.ObjReference,
 				MethodID:     msg.MethodID,
 				Args:         nil,
@@ -146,6 +148,4 @@ func (s *UDPServer) Start() {
 			log.Printf("Erro ao enviar resposta: %v", err)
 		}
 	}
-
 }
-
