@@ -13,7 +13,7 @@ import (
 
 type CacheEntry struct {
 	Addr *net.UDPAddr
-	ID   int
+	ID   int64
 }
 
 type UDPServer struct {
@@ -52,29 +52,25 @@ func (s *UDPServer) GetRequest() (*message.Message, *net.UDPAddr, error) {
 		return nil, nil, err
 	}
 
-	if msg.ID%3 == 0 {
-		s.mu.Lock()
-		defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-		cacheKey := addr.String()
+	cacheKey := addr.String()
 
-		if entry, exists := s.cache[cacheKey]; exists {
-			if entry.ID == msg.ID {
-				log.Println("Mensagem duplicada recebida:", msg.ID, "de", addr)
-				return nil, nil, fmt.Errorf("duplicated message: %d", msg.ID)
-			}
+	if entry, exists := s.cache[cacheKey]; exists {
+		if entry.ID == msg.ID {
+			log.Println("Mensagem duplicada recebida:", msg.ID, "de", addr)
+			return nil, nil, fmt.Errorf("duplicated message: %d", msg.ID)
 		}
-
-		s.cache[cacheKey] = &CacheEntry{
-			Addr: addr,
-			ID:   msg.ID,
-		}
-
-		log.Println("Mensagem recebida de:", addr)
-		return &msg, addr, nil
 	}
 
-	return nil, nil, fmt.Errorf("o id da mensagem é multiplo de 3, logo é ignorada")
+	s.cache[cacheKey] = &CacheEntry{
+		Addr: addr,
+		ID:   msg.ID,
+	}
+
+	log.Println("Mensagem recebida de:", addr)
+	return &msg, addr, nil
 }
 
 func (s *UDPServer) SendResponse(addr *net.UDPAddr, response *message.Message) error {
@@ -98,8 +94,18 @@ func (s *UDPServer) Close() error {
 
 func (s *UDPServer) handleRequest(m *message.Message) []byte {
 	skeleton := db.NewSkeleton()
+	if err := skeleton.GetInitError(); err != nil {
+		fmt.Printf("Erro na inicialização: %v\n", err)
+		// Trate o erro, como tentar reconectar ou encerrar o programa
+		return nil
+	}
+
+	// Continue com a lógica do programa se não houver erro
+
 	dispatcher := db.NewDispacher(skeleton)
-	response, err := dispatcher.Invoke(m.ObjReference, m.MethodID, m.Args)
+	param := db.NewParametros(m.ObjReference, m.MethodID, m.Args)
+	response, err := dispatcher.Invoke(param)
+
 	if err != nil {
 		log.Printf("Erro ao obter resposta: %v", err)
 		return nil
@@ -118,12 +124,14 @@ func (s *UDPServer) Start() {
 			continue // Pula para a próxima iteração caso ocorra um erro
 		}
 
+		log.Println(msg.ObjReference)
 		log.Printf("Mensagem recebida do cliente %s: %+v", addr.String(), msg)
 		response := s.handleRequest(msg)
 
 		if response == nil {
 			// Se a resposta for nil, envie uma mensagem de encerramento
 			shutdownMessage := &message.Message{
+
 				ObjReference: msg.ObjReference,
 				MethodID:     msg.MethodID,
 				Args:         nil,
@@ -136,8 +144,7 @@ func (s *UDPServer) Start() {
 			if err != nil {
 				log.Printf("Erro ao enviar mensagem de encerramento: %v", err)
 			}
-			log.Println("Encerrando o servidor devido a resposta nil.")
-			break // Encerra o loop e o servidor
+
 		}
 
 		msg.Args = response
@@ -148,4 +155,5 @@ func (s *UDPServer) Start() {
 			log.Printf("Erro ao enviar resposta: %v", err)
 		}
 	}
+
 }
