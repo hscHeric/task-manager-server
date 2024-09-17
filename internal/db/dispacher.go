@@ -5,6 +5,20 @@ import (
 	"fmt"
 )
 
+type Parametros struct {
+	Object  string
+	Command string
+	Args    []byte
+}
+
+func NewParametros(object, command string, args []byte) *Parametros {
+	return &Parametros{
+		Object:  object,
+		Command: command,
+		Args:    args,
+	}
+}
+
 type Dispacher struct {
 	skeleton *Skeleton
 }
@@ -13,27 +27,22 @@ func NewDispacher(skeleton *Skeleton) *Dispacher {
 	return &Dispacher{skeleton: skeleton}
 }
 
-func (d *Dispacher) Invoke(object string, command string, args []byte) ([]byte, error) {
-	switch object {
+func (d *Dispacher) Invoke(p *Parametros) ([]byte, error) {
+	switch p.Object {
 	case "Task":
-		return d.InvokeTask(command, args)
+		switch p.Command {
+		case "InsertTask":
+			return d.skeleton.InsertTask(p.Args)
+		case "GetAllTasks":
+			return d.skeleton.GetAllTasks()
+		case "GetTaskByID":
+			return d.skeleton.GetTaskByID(p.Args)
+		case "DeleteTask":
+			return d.skeleton.DeleteTask(p.Args)
+		default:
+			return json.Marshal(fmt.Sprintf("comando nao reconhecido: %s", p.Command))
+		}
 	default:
-		return json.Marshal(fmt.Sprintf("comando não reconhecido: %s", command))
+		return json.Marshal(fmt.Sprintf("objeto nao reconhecido: %s", p.Object))
 	}
 }
-
-func (d *Dispacher) InvokeTask(command string, args []byte) ([]byte, error) {
-	switch command {
-	case "InsertTask":
-		return d.skeleton.InsertTask(args)
-	case "GetAllTasks":
-		return d.skeleton.GetAllTasks()
-	case "GetTaskByID":
-		return d.skeleton.GetTaskByID(args)
-	case "DeleteTask":
-		return d.skeleton.DeleteTask(args)
-	default:
-		return json.Marshal(fmt.Sprintf("comando não reconhecido: %s", command))
-	}
-}
-
