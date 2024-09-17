@@ -33,19 +33,41 @@ def create_task(title, description, date):
 
     return request_bytes
 
+def create_task_id(task_id):
+    task_id_dict = {
+        "TaskId": task_id
+    }
+
+    request_json = json.dumps(task_id_dict)  # Use o dicionário task_id_dict
+    request_bytes = request_json.encode('utf-8')
+
+    return request_bytes
+
+
+def imprimirTarefas(response):
+    print("Resposta do Servidor:\n")
+    
+    response_json = json.loads(json.dumps(response))
+    
+    args_base64 = response_json.get('Args', '')
+    args_bytes = base64.b64decode(args_base64)
+    
+    request_data = json.loads(args_bytes.decode('utf-8'))
+    
+    tasks = request_data
+    print("\nTarefas Recebidas:")
+    for task in tasks:
+        print(f"\nTask ID: {task['taskId']}")
+        print(f"Date: {task['date']}")
+        print(f"Title: {task['title']}")
+        print(f"Description: {task['description']}")
+
 def imprimir(response):
-    print("\nResposta do Servidor:")
     response_json = json.loads(json.dumps(response))
     args_base64 = response_json.get('Args', '')
     args_bytes = base64.b64decode(args_base64)
-    request_data = json.loads(args_bytes.decode('utf-8'))
-    print("ObjReference:", response_json.get('ObjReference'))
-    print("MethodID:", response_json.get('MethodID'))
-    print("Args:", request_data)  # Exibe os dados da requisição
-    print("T:", response_json.get('T'))
-    print("ID:", response_json.get('ID'))
-    print("StatusCode:", response_json.get('StatusCode'))
-    
+    print(args_bytes)
+
 
 def main():
     hostname = 'localhost'
@@ -57,7 +79,7 @@ def main():
         while True:
             print("\nEscolha uma opção:")
             print("1. Adicionar Tarefa")
-            print("2. Editar Tarefa")
+            print("2. Obter Tarefa pelo Id")
             print("3. Remover Tarefa")
             print("4. Listar Tarefas")
             print("5. Sair")
@@ -68,7 +90,6 @@ def main():
                 descricao = input("Descrição: ")
                 data_vencimento = input("Data de Vencimento (YYYY-MM-DD): ")
 
-                # Verifica se a data é válida
                 try:
                     data = validar_data(data_vencimento)
                 except ValueError as e:
@@ -84,56 +105,27 @@ def main():
 
             elif opcao == '2':
                 task_id = input("ID da Tarefa: ")
-
-                # Verifica se o ID é válido
-                try:
-                    validar_id(task_id)
-                except ValueError as e:
-                    print(e)
-                    continue
-
-                # Verifica se o ID existe
-                if not id_existe(task_id, tarefas):
-                    print(f"Erro: Tarefa com ID {task_id} não encontrada.")
-                    continue
-
-                titulo = input("Novo Título: ")
-                descricao = input("Nova Descrição: ")
-                data_vencimento = input("Nova Data de Vencimento (YYYY-MM-DD): ")
-
-                try:
-                    validar_data(data_vencimento)
-                except ValueError as e:
-                    print(e)
-                    continue
-
-                task = {'titulo': titulo, 'descricao': descricao, 'data_vencimento': data_vencimento}
-                response = proxy.GetTaskById(task_id, task)
-                print(f"Tarefa {task_id} editada com sucesso.")
+                taskId = create_task_id(task_id)
+                response = proxy.GetTaskByID(taskId)
+                if response:
+                    imprimir(response)
+                else:
+                    print("Erro ao obter tarefa")
 
             elif opcao == '3':
                 task_id = input("ID da Tarefa: ")
+                taskId = create_task_id(task_id)
+                response = proxy.DeleteTask(taskId)
+                if response:
+                    imprimir(response)
+                else:
+                    print("Erro ao excluir tarefa")
 
-                # Verifica se o ID é válido
-                try:
-                    validar_id(task_id)
-                except ValueError as e:
-                    print(e)
-                    continue
-
-                # Verifica se o ID existe
-                if not id_existe(task_id, tarefas):
-                    print(f"Erro: Tarefa com ID {task_id} não encontrada.")
-                    continue
-
-                response = proxy.RemoveTask(task_id)
-                print(f"Tarefa {task_id} removida com sucesso.")
 
             elif opcao == '4':
-                tarefas = proxy.GetAllTasks()
-                print("Tarefas cadastradas:")
-                for tarefa in tarefas:
-                    print(f"ID: {tarefa['id']}, Título: {tarefa['titulo']}, Descrição: {tarefa['descricao']}, Data de Vencimento: {tarefa['data_vencimento']}")
+                response = proxy.GetAllTasks()
+                if response:
+                    imprimirTarefas(response)
 
             elif opcao == '5':
                 break
@@ -148,6 +140,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
 
 
 
