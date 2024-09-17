@@ -7,31 +7,39 @@ class Proxy:
     def __init__(self, hostname, port):
         self.client = UDPClient(hostname, port)
    
-    def InsertTask(self, task):
-        p = ('localhost', 12345)
+    def sendMessage(self,msg):
+        self.client.send_request(msg)
+        
+        response_bytes = self.client.receive_response()
+        return response_bytes
+    
+    def do_operation(self, obj_reference, method_id, params):
         id = IDGenerator()
-        obj_reference = "Task"
-        method_id = "InsertTask"      
-        msg = Message(obj_reference,method_id,task,0,id)
+        msg = Message(obj_reference, method_id, params, 0, id)
         message = msg.to_bytes()
-        self.client.send_request(message)
-        request = self.client.receive_response()        
-        return request
+        
+        return self.sendMessage(message)
+    
+   
+    def InsertTask(self, task):
+        return self.do_operation("Task","InsertTask",task)     
 
-    def GetTaskById(self, task_id, task):
-        # Edita uma tarefa
-        response = self.do_operation("Task","GetTaskById", task_id=task_id, task=task)
-        return response
+    def GetTaskByID(self, task_id):
+        return self.do_operation("Task","GetTaskByID", task_id)
 
-    def RemoveTask(self, task_id):
-        # Remove uma tarefa
-        response = self.do_operation("Task","RemoveTask", task_id=task_id)
-        return response
+    def DeleteTask(self, task_id):
+        return self.do_operation("Task","DeleteTask", task_id)
 
     def GetAllTasks(self):
-        # Lista todas as tarefas
-        response = self.do_operation("Task","GetAllTasks")
-        return response.get('tarefas', [])  # Retorna uma lista de tarefas
+        id = IDGenerator()
+        request_bytes = b'' 
+        message = Message("Task", "GetAllTasks", request_bytes, 0, id)
+        message_bytes = message.to_bytes()
+        return self.sendMessage(message_bytes)
+        
+        
+        
 
     def close(self):
         self.client.close()
+
