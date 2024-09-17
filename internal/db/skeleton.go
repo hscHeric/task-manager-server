@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
+	"sync"
 	"time"
 
 	"github.com/hscHeric/task-manager-server/internal/task"
@@ -13,24 +13,45 @@ import (
 
 const dbPath = "/home/gabriel/Downloads/SD_ENVIO_03/task-manager-server/cmd/server/tasks.db"
 
-type Skeleton struct{}
-
-func NewSkeleton() *Skeleton {
-	return &Skeleton{}
+type Skeleton struct {
+	db      *sql.DB
+	initErr error
 }
 
-func initDB() *sql.DB {
-	dbConn, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatal(fmt.Errorf("erro ao abrir o banco de dados: %w", err))
-	}
+var (
+	instance *Skeleton
+	once     sync.Once
+)
 
-	if err = dbConn.Ping(); err != nil {
-		log.Fatal(fmt.Errorf("erro ao conectar ao banco de dados: %w", err))
-	}
+func NewSkeleton() *Skeleton {
+	once.Do(func() {
+		dbConn, err := sql.Open("sqlite3", dbPath)
+		if err != nil {
+			instance = &Skeleton{
+				initErr: fmt.Errorf("erro ao abrir o banco de dados: %w", err),
+			}
+			return
+		}
 
-	fmt.Println("Conectado ao banco de dados com sucesso")
-	return dbConn
+		if err = dbConn.Ping(); err != nil {
+			instance = &Skeleton{
+				initErr: fmt.Errorf("erro ao conectar ao banco de dados: %w", err),
+			}
+			return
+		}
+
+		fmt.Println("Conectado ao banco de dados com sucesso")
+
+		instance = &Skeleton{
+			db: dbConn,
+		}
+	})
+
+	return instance
+}
+
+func (s *Skeleton) GetInitError() error {
+	return s.initErr
 }
 
 type request struct {
@@ -45,15 +66,13 @@ type ID struct {
 
 func (s *Skeleton) InsertTask(data []byte) ([]byte, error) {
 	var req request
-	dbConn := initDB()
-	defer dbConn.Close()
 
 	if err := json.Unmarshal(data, &req); err != nil {
 		return nil, fmt.Errorf("falha ao desserializar o JSON da requisição: %w", err)
 	}
 
 	newTask := task.NewTask(req.Title, req.Description, req.Date)
-	dbService := NewDatabaseService(dbConn)
+	dbService := NewDatabaseService(s.db)
 
 	if err := dbService.InsertTask(newTask); err != nil {
 		return nil, fmt.Errorf("falha ao inserir a tarefa no banco de dados: %w", err)
@@ -63,9 +82,7 @@ func (s *Skeleton) InsertTask(data []byte) ([]byte, error) {
 }
 
 func (s *Skeleton) GetAllTasks() ([]byte, error) {
-	dbConn := initDB()
-	defer dbConn.Close()
-	dbService := NewDatabaseService(dbConn)
+	dbService := NewDatabaseService(s.db)
 
 	tasks, err := dbService.GetAllTasks()
 	if err != nil {
@@ -76,15 +93,12 @@ func (s *Skeleton) GetAllTasks() ([]byte, error) {
 }
 
 func (s *Skeleton) GetTaskByID(data []byte) ([]byte, error) {
-	dbConn := initDB()
-	defer dbConn.Close()
-	dbService := NewDatabaseService(dbConn)
-
 	var id ID
 	if err := json.Unmarshal(data, &id); err != nil {
 		return nil, fmt.Errorf("erro ao desserializar o ID: %w", err)
 	}
 
+	dbService := NewDatabaseService(s.db)
 	t, err := dbService.GetTaskByID(id.TaskID)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao obter a tarefa: %w", err)
@@ -94,19 +108,15 @@ func (s *Skeleton) GetTaskByID(data []byte) ([]byte, error) {
 }
 
 func (s *Skeleton) DeleteTask(data []byte) ([]byte, error) {
-	dbConn := initDB()
-	defer dbConn.Close()
-	dbService := NewDatabaseService(dbConn)
-
 	var id ID
 	if err := json.Unmarshal(data, &id); err != nil {
 		return nil, fmt.Errorf("erro ao desserializar o ID: %w", err)
 	}
 
+	dbService := NewDatabaseService(s.db)
 	if err := dbService.DeleteTask(id.TaskID); err != nil {
 		return nil, fmt.Errorf("erro ao excluir a tarefa: %w", err)
 	}
 
-	return json.Marshal("Tarefa excluída com sucesso")
+	return json.Marshal("Tarefa excluida com sucesso")
 }
-
