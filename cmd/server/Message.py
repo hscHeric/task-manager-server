@@ -4,16 +4,17 @@ import threading
 import sys
 
 
+import time
+
 class IDGenerator:
     def __init__(self):
-        self.id = sys.maxsize  
+        self.id = int(time.time())  # Usa o timestamp atual como valor inicial
         self.lock = threading.Lock()
 
     def get_next_id(self):
         with self.lock:
-            self.id -= 1
+            self.id += 1
             return self.id
-        
 
 class Message:
     def __init__(self, obj_reference, method_id, request_bytes, t, id_generator):
