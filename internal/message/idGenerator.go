@@ -7,14 +7,14 @@ import (
 
 type IDGenerator struct {
 	mu sync.Mutex
-	id int
+	id int64
 }
 
 func NewIDGenerator() *IDGenerator {
 	return &IDGenerator{id: math.MaxInt}
 }
 
-func (gen *IDGenerator) GetNextID() int {
+func (gen *IDGenerator) GetNextID() int64 {
 	gen.mu.Lock()
 	defer gen.mu.Unlock()
 	gen.id--
