@@ -23,11 +23,12 @@ class UDPClient:
                 return json.loads(packet.decode())
             except socket.timeout:
                 retries += 1
-                print(f"Timeout! Tentativa {retries} de {self.max_retries}. Reenviando a mensagem...")
+                print(f"Timeout! Tentativa {retries} de {self.max_retries}. Esperando a mensagem...")
 
-        print("Erro: Número máximo de tentativas alcançado. Falha na comunicação com o servidor.")
+        print("Erro: Número máximo de tentativas alcançado. O servidor pode ter ignorado a mensagem por ser duplicada.")
         return None
 
     def close(self):
         self.socket.close()
+
 
