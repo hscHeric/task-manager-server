@@ -1,68 +1,39 @@
-from UDPClient import *
-import json
+import  json
 import base64
-from Message import *
+import threading
+import sys
 
-class Proxy:
-    def __init__(self, hostname, port,):
-        self.client = UDPClient(hostname, port)
-   
-    def sendMessage(self, msg):
-        retries = 0
-        while retries < self.client.max_retries:
-            self.client.send_request(msg)  # Envia a requisição
 
-            response_bytes = self.client.receive_response()  # Espera pela resposta
+import time
 
-            if response_bytes is not None:
-                return response_bytes  
+class IDGenerator:
+    def __init__(self):
+        self.id = int(time.time())  # Usa o timestamp atual como valor inicial
+        self.lock = threading.Lock()
 
-            print(f"Timeout! Tentativa {retries + 1} de {self.client.max_retries}. Reenviando a mensagem...")
-            retries += 1 
+    def get_next_id(self):
+        with self.lock:
+            self.id += 1
+            return self.id
 
-        print("Erro: Número máximo de tentativas alcançado. O servidor pode ter ignorado a mensagem.")
-        return None  
+class Message:
+    def __init__(self, obj_reference, method_id, request_bytes, t, id_generator):
+        self.ObjReference = obj_reference
+        self.MethodID = method_id
+        self.Args = base64.b64encode(request_bytes).decode('utf-8')
+        self.T = t
+        self.ID = id_generator.get_next_id()  
+        self.StatusCode = 0
 
-    
-    def do_operation(self, obj_reference, method_id, params):
-        id = IDGenerator()
-        msg = Message(obj_reference, method_id, params, 0, id)
-        message = msg.to_bytes()
+    def to_bytes(self):
+        message = {
+            "ObjReference": self.ObjReference,
+            "MethodID": self.MethodID,
+            "Args": self.Args,
+            "T": self.T,
+            "ID": self.ID,
+            "StatusCode": self.StatusCode
+        }
         
-        return self.sendMessage(message)
-    
-    def LostMsgTest(self, obj_reference, method_id, params):
-        id = IDGenerator()
-        msg = Message(obj_reference, method_id, params, 3, id)
-        message = msg.to_bytes()
-        
-        return self.sendMessage(message)
-    
-
-    
-   
-    def InsertTask(self, task):
-        return self.do_operation("Task","InsertTask",task)   
-
-    def LostTaskInsetMsg(self, task):
-        return self.LostMsgTest("Task","InsertTask",task)      
-
-    def GetTaskByID(self, task_id):
-        return self.do_operation("Task","GetTaskByID", task_id)
-
-    def DeleteTask(self, task_id):
-        return self.do_operation("Task","DeleteTask", task_id)
-
-    def GetAllTasks(self):
-        id = IDGenerator()
-        request_bytes = b'' 
-        message = Message("Task", "GetAllTasks", request_bytes, 0, id)
-        message_bytes = message.to_bytes()
-        return self.sendMessage(message_bytes)
-        
-        
-        
-
-    def close(self):
-        self.client.close()
-
+        json_message = json.dumps(message)
+        return json_message.encode('utf-8')
