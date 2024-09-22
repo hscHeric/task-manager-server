@@ -5,7 +5,7 @@ type Message struct {
 	MethodID     string
 	Args         []byte
 	T            int
-	ID           int
+	ID           int64
 	StatusCode   int
 }
 
