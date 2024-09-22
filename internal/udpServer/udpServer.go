@@ -11,6 +11,8 @@ import (
 	"github.com/hscHeric/task-manager-server/internal/message"
 )
 
+var ignoreFirstResponse = true //variavel global para o caso de teste de mensagem perdida
+
 type CacheEntry struct {
 	Addr *net.UDPAddr
 	ID   int64
@@ -50,6 +52,16 @@ func (s *UDPServer) GetRequest() (*message.Message, *net.UDPAddr, error) {
 	err = json.Unmarshal(buffer[:n], &msg)
 	if err != nil {
 		return nil, nil, err
+	}
+
+	//ignorar primeira a resposta se for igual a -Teste mensagem perdida-.
+	if ignoreFirstResponse {
+		print("ok")
+	}
+	if msg.T == 3 && ignoreFirstResponse {
+		log.Println("Ignorando a mensagem de teste de mensagem perdida.")
+		ignoreFirstResponse = false // Ignora apenas a primeira vez
+		return nil, nil, fmt.Errorf("simulação de perda de mensagem: %d", msg.T)
 	}
 
 	s.mu.Lock()
@@ -96,11 +108,8 @@ func (s *UDPServer) handleRequest(m *message.Message) []byte {
 	skeleton := db.NewSkeleton()
 	if err := skeleton.GetInitError(); err != nil {
 		fmt.Printf("Erro na inicialização: %v\n", err)
-		// Trate o erro, como tentar reconectar ou encerrar o programa
 		return nil
 	}
-
-	// Continue com a lógica do programa se não houver erro
 
 	dispatcher := db.NewDispacher(skeleton)
 	param := db.NewParametros(m.ObjReference, m.MethodID, m.Args)
@@ -121,7 +130,7 @@ func (s *UDPServer) Start() {
 		msg, addr, err := s.GetRequest()
 		if err != nil {
 			log.Printf("Erro ao receber mensagem: %v", err)
-			continue // Pula para a próxima iteração caso ocorra um erro
+			continue
 		}
 
 		log.Println(msg.ObjReference)
@@ -129,7 +138,6 @@ func (s *UDPServer) Start() {
 		response := s.handleRequest(msg)
 
 		if response == nil {
-			// Se a resposta for nil, envie uma mensagem de encerramento
 			shutdownMessage := &message.Message{
 
 				ObjReference: msg.ObjReference,
@@ -157,4 +165,3 @@ func (s *UDPServer) Start() {
 	}
 
 }
-
