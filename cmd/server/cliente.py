@@ -2,6 +2,7 @@ from Proxy import Proxy
 from datetime import datetime, timezone
 import json
 import base64
+import time
 
 def validar_data(data_str):
     try:
@@ -76,13 +77,16 @@ def main():
     try:
         proxy = Proxy(hostname, port)
 
+        
         while True:
             print("\nEscolha uma opção:")
             print("1. Adicionar Tarefa")
             print("2. Obter Tarefa pelo Id")
             print("3. Remover Tarefa")
             print("4. Listar Tarefas")
-            print("5. Sair")
+            print("5. Testar Mensagem Duplicada")
+            print("6. Testar Perda de Mensagem")
+            print("7. Sair")
             opcao = input("Opção: ")
 
             if opcao == '1':
@@ -95,13 +99,12 @@ def main():
                 except ValueError as e:
                     print(e)
                     continue
-                task = create_task(titulo,descricao,data)
+                task = create_task(titulo, descricao, data)
                 response = proxy.InsertTask(task)
                 if response:
                     imprimir(response)
                 else:
                     print('Error ao inserir a tarefa')
-
 
             elif opcao == '2':
                 task_id = input("ID da Tarefa: ")
@@ -121,18 +124,58 @@ def main():
                 else:
                     print("Erro ao excluir tarefa")
 
-
             elif opcao == '4':
                 response = proxy.GetAllTasks()
                 if response:
                     imprimirTarefas(response)
 
-            elif opcao == '5':
+            elif opcao == '5':  # Testar mensagem duplicada
+                titulo = input("Título da Tarefa Duplicada: ")
+                descricao = input("Descrição da Tarefa Duplicada: ")
+                data_vencimento = input("Data de Vencimento (YYYY-MM-DD): ")
+
+                try:
+                    data = validar_data(data_vencimento)
+                except ValueError as e:
+                    print(e)
+                    continue
+                
+                task = create_task(titulo, descricao, data)
+                response1 = proxy.InsertTask(task)
+                if response1:
+                    imprimir(response1)
+                else:
+                    print('Error ao inserir a tarefa')
+
+                response2 = proxy.InsertTask(task)
+                if response2:
+                    imprimir(response2) 
+                else:
+                    print('Error ao inserir a tarefa duplicada')
+
+            elif opcao == '6':  # Testar perda de mensagem
+                titulo = input("Título da Tarefa (simular perda): ")
+                descricao = input("Descrição da Tarefa (simular perda): ")
+                data_vencimento = input("Data de Vencimento (YYYY-MM-DD): ")
+
+                try:
+                    data = validar_data(data_vencimento)
+                except ValueError as e:
+                    print(e)
+                    continue
+                
+                task = create_task(titulo, descricao, data)
+                response1 = proxy.LostTaskInsetMsg(task)
+                if response1:
+                    imprimir(response1)
+                else:
+                    print('Error ao inserir a tarefa ')
+
+            elif opcao == '7':
                 break
 
             else:
                 print("Opção inválida. Tente novamente.")
-
     except Exception as e:
         print(f"Erro: {e}")
     finally:
@@ -140,6 +183,9 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
 
 
 
